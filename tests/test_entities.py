@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import sys
 import pytest
 from tinycrate.tinycrate import TinyCrate, TinyCrateException, minimal_crate
 
@@ -13,6 +14,18 @@ def test_basic_entity():
     for prop, val in props.items():
         assert entity[prop] == val
 
+def test_prop_interface():
+    """Create a single entity"""
+    crate = minimal_crate()
+    props = {"name": "A dataset", "description": "The description of the dataset"}
+    crate.add("Dataset", "#mydata", props)
+    entity = crate.get("#mydata")
+    # This hangs
+    for val in entity:
+        print("Here", file=sys.stderr)
+    # as does this
+    if "name" in entity:
+        pass
 
 def test_modify_entity(tmp_path):
     """Modify an entity and see if the change is written out to the crate"""
