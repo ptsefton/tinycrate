@@ -203,11 +203,18 @@ class TinyCrate:
         self.base_url = None
 
     def add(self, t: Union[str, list[str]], i: str, props: dict[str, Any]) -> None:
+        """Add an entity. If an entity with this @id already exists it is
+        replaced, as @ids must be unique in an RO-Crate"""
         json_props = dict(props)
         json_props["@id"] = i
         json_props["@type"] = t
-        self.graph.append(json_props)
-        self._id_index[i] = (len(self.graph) - 1, json_props)
+        if i in self._id_index:
+            index, _ = self._id_index[i]
+            self.graph[index] = json_props
+        else:
+            self.graph.append(json_props)
+            index = len(self.graph) - 1
+        self._id_index[i] = (index, json_props)
 
     def all(self) -> list[TinyEntity]:
         return [TinyEntity(self, e) for e in self.graph]

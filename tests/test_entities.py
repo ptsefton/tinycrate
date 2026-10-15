@@ -97,3 +97,19 @@ def test_deref_all():
     assert ds.get_list("publisher") == [{"@id": "#alice"}]
     assert ds.get_list("keywords") == ["one", "two"]
     assert ds.get_list("missing") == []
+
+
+def test_add_existing_id():
+    """Adding an entity with an existing @id replaces it, not duplicates it"""
+    crate = minimal_crate()
+    n = len(crate.graph)
+    crate.add("Person", "#alice", {"name": "Alice"})
+    crate.add("Person", "#alice", {"name": "Alice Smith"})
+    assert len(crate.graph) == n + 1
+    assert crate.get("#alice")["name"] == "Alice Smith"
+    assert len([e for e in crate.all() if e.id == "#alice"]) == 1
+    # entities fetched after the replacement still write through to the graph
+    alice = crate.get("#alice")
+    alice["name"] = "A. Smith"
+    reloaded = TinyCrate(json.loads(crate.json()))
+    assert reloaded.get("#alice")["name"] == "A. Smith"
