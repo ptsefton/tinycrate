@@ -94,7 +94,7 @@ class TinyCrate:
     def __init__(self, source: Union[str, Path, None] = None) -> None:
         self.directory: Optional[Path] = None
         self._context_resolver: Optional[JSONLDContextResolver] = None
-        self._id_index: dict[str, dict] = {}
+        self._id_index: dict[str, tuple[int, dict]] = {}
         if source is not None:
             if isinstance(source, PurePath):
                 self._open_path(source)
@@ -172,7 +172,7 @@ class TinyCrate:
         return [TinyEntity(self, e) for e in self.graph]
 
     def get(self, i: str) -> Optional[TinyEntity]:
-        entry = self._id_index.get(i) 
+        entry = self._id_index.get(i)
         if entry:
             _, e = entry  # unpacking (index, entity) tuple
             return TinyEntity(self, e)
