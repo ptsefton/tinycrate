@@ -73,3 +73,27 @@ def test_missing_id():
                 "@graph": [{"@type": "Thing", "name": "No id"}],
             }
         )
+
+
+def test_deref_all():
+    """Follow references from single and multi-valued properties"""
+    crate = minimal_crate()
+    crate.add("Person", "#alice", {"name": "Alice"})
+    crate.add("Person", "#bob", {"name": "Bob"})
+    crate.add(
+        "Dataset",
+        "#ds",
+        {
+            "author": [{"@id": "#alice"}, {"@id": "#bob"}, {"@id": "#nobody"}],
+            "publisher": {"@id": "#alice"},
+            "keywords": ["one", "two"],
+        },
+    )
+    ds = crate.get("#ds")
+    assert [e.id for e in crate.deref_all(ds, "author")] == ["#alice", "#bob"]
+    assert [e.id for e in crate.deref_all(ds, "publisher")] == ["#alice"]
+    assert crate.deref_all(ds, "keywords") == []
+    assert crate.deref_all(ds, "missing") == []
+    assert ds.get_list("publisher") == [{"@id": "#alice"}]
+    assert ds.get_list("keywords") == ["one", "two"]
+    assert ds.get_list("missing") == []

@@ -71,6 +71,16 @@ class TinyEntity:
             return val
         return None
 
+    def get_list(self, prop: str) -> list[Any]:
+        """get a property on this entity as a list, whether it has a single
+        value or a list of values. Returns [] if the property isn't set"""
+        val = self[prop]
+        if val is None:
+            return []
+        if isinstance(val, list):
+            return val
+        return [val]
+
     def items(self) -> Generator[Tuple[str, Union[str, Dict]]]:
         for k, v in self.props.items():
             yield k, v
@@ -197,14 +207,26 @@ class TinyCrate:
         return None
 
     def deref(self, entity: TinyEntity, prop: str) -> Optional[TinyEntity]:
-        """Given an entity and a property, try to follow the @id - needs
-        to be fixed to work with lists"""
+        """Given an entity and a property, try to follow the @id. Only works
+        for single-valued properties: use deref_all for lists"""
         id_dict: Optional[Dict] = entity.get_dict(prop)
         if id_dict is not None:
             ref: Optional[str] = id_dict.get("@id", None)
             if ref is not None:
                 return self.get(ref)
         return None
+
+    def deref_all(self, entity: TinyEntity, prop: str) -> list[TinyEntity]:
+        """Given an entity and a property which may have one value or a list,
+        return every entity in this crate referenced by an @id. Literal
+        values and references to entities not in the crate are skipped"""
+        targets = []
+        for val in entity.get_list(prop):
+            if isinstance(val, dict) and "@id" in val:
+                target = self.get(val["@id"])
+                if target is not None:
+                    targets.append(target)
+        return targets
 
     def root(self) -> TinyEntity:
         """Find the Root Data Entity via the metadata descriptor, falling
