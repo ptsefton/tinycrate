@@ -3,7 +3,7 @@ from pathlib import Path, PurePath
 import json
 import requests
 import datetime
-from urllib.parse import unquote, urljoin
+from urllib.parse import unquote, urljoin, urlparse
 from typing import Any, Optional, Union, Tuple, Dict, Generator, Iterator
 
 from tinycrate.jsonld_context import JSONLDContextResolver
@@ -134,8 +134,12 @@ class TinyEntity:
     def _url(self) -> Optional[str]:
         """The absolute URL to fetch this entity from, or None if it should
         be fetched from the crate directory"""
-        if self.id[:4] == "http":
+        scheme = urlparse(self.id).scheme.lower()
+        if scheme in ("http", "https"):
             return self.id
+        if scheme:
+            # an absolute IRI such as arcp:// which isn't fetchable
+            raise TinyCrateException(f"Can't fetch {self.id}: unsupported scheme")
         if self.crate.base_url is not None:
             return urljoin(self.crate.base_url, self.id)
         return None

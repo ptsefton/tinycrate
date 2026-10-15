@@ -1,6 +1,7 @@
 from pytest_httpserver import HTTPServer
 
-from tinycrate.tinycrate import TinyCrate, minimal_crate
+import pytest
+from tinycrate.tinycrate import TinyCrate, TinyCrateException, minimal_crate
 
 
 def test_fetch_from_url(crates, httpserver: HTTPServer):
@@ -94,3 +95,18 @@ def test_fetch_utf8_http(httpserver: HTTPServer):
         crate.add("File", httpserver.url_for(path), {})
     assert crate.get(httpserver.url_for("/nocharset.txt")).fetch() == text
     assert crate.get(httpserver.url_for("/latin1.txt")).fetch() == "Ünïcödé"
+
+
+def test_fetch_non_http_iri(tmp_path):
+    """Absolute IRIs with other schemes can't be fetched, and relative paths
+    that happen to start with 'http' are still files"""
+    (tmp_path / "httpdocs").mkdir()
+    (tmp_path / "httpdocs" / "page.txt").write_text("local", encoding="utf-8")
+    crate = minimal_crate()
+    crate.add("File", "httpdocs/page.txt", {})
+    crate.add("File", "arcp://name,corpus/data/file.txt", {})
+    crate.write_json(tmp_path)
+    crate2 = TinyCrate(tmp_path)
+    assert crate2.get("httpdocs/page.txt").fetch() == "local"
+    with pytest.raises(TinyCrateException):
+        crate2.get("arcp://name,corpus/data/file.txt").fetch()
