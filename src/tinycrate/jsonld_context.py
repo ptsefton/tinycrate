@@ -35,14 +35,14 @@ class JSONLDContextResolver:
 
         Args:
             context: The JSON-LD context to resolve. Can be:
-                    - A URL string (https://w3id.org/ro/crate/1.1/context)
+                    - A URL string (https://w3id.org/ro/crate/1.3/context)
                     - A path to a local file
                     - A dictionary of context definitions
                     - A list of multiple contexts (URLs, dictionaries, or mixed)
-                    - None (defaults to RO-Crate 1.1 context)
+                    - None (defaults to RO-Crate 1.3 context)
         """
         self.raw_context = (
-            context if context is not None else "https://w3id.org/ro/crate/1.1/context"
+            context if context is not None else "https://w3id.org/ro/crate/1.3/context"
         )
         # The merged, final context mapping
         self.context_map: Dict = {}

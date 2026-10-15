@@ -175,3 +175,11 @@ def test_utf8_metadata_over_http(httpserver: HTTPServer):
     )
     crate2 = TinyCrate(httpserver.url_for("/ro-crate-metadata.json"))
     assert crate2.root()["name"] == name
+
+
+def test_new_crates_are_1_3():
+    """New crates use the RO-Crate 1.3 context and profile"""
+    crate = minimal_crate()
+    assert crate.context == "https://w3id.org/ro/crate/1.3/context"
+    descriptor = crate.get("ro-crate-metadata.json")
+    assert descriptor["conformsTo"] == {"@id": "https://w3id.org/ro/crate/1.3"}

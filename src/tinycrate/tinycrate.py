@@ -8,6 +8,9 @@ from typing import Any, Optional, Union, Tuple, Dict, Generator
 
 from tinycrate.jsonld_context import JSONLDContextResolver
 
+RO_CRATE_PROFILE = "https://w3id.org/ro/crate/1.3"
+RO_CRATE_CONTEXT = "https://w3id.org/ro/crate/1.3/context"
+
 LICENSE_ID = "https://creativecommons.org/licenses/by-nc-sa/3.0/au/"
 LICENSE_DESCRIPTION = (
     "This work is licensed under the Creative Commons "
@@ -178,7 +181,7 @@ class TinyCrate:
                             f"JSON-LD dict (got a {t})"
                         )
         else:
-            self.context = "https://w3id.org/ro/crate/1.1/context"
+            self.context = RO_CRATE_CONTEXT
             self.graph: list[dict] = []
 
     def _open_jsonld(self, jsonld: dict[str, Any]) -> None:
@@ -365,7 +368,7 @@ def minimal_crate(
         "ro-crate-metadata.json",
         {
             "about": {"@id": "./"},
-            "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
+            "conformsTo": {"@id": RO_CRATE_PROFILE},
         },
     )
     return crate
