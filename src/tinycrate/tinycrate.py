@@ -4,7 +4,7 @@ import json
 import requests
 import datetime
 from urllib.parse import unquote, urljoin
-from typing import Any, Optional, Union, Tuple, Dict, Generator
+from typing import Any, Optional, Union, Tuple, Dict, Generator, Iterator
 
 from tinycrate.jsonld_context import JSONLDContextResolver
 
@@ -48,6 +48,18 @@ class TinyEntity:
 
     def __getitem__(self, prop: str) -> Union[str, Dict, None]:
         return self.props.get(prop, None)
+
+    # Without __iter__ and __contains__, Python falls back to calling
+    # __getitem__ with 0, 1, 2... until IndexError, which never comes, so
+    # "for p in entity" and "p in entity" looped forever (issue #17)
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.props)
+
+    def __contains__(self, prop: object) -> bool:
+        return prop in self.props
+
+    def __len__(self) -> int:
+        return len(self.props)
 
     def __setitem__(self, prop: str, val: Union[str, Dict]) -> None:
         self.props[prop] = val
