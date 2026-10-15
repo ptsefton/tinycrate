@@ -1,12 +1,15 @@
 from __future__ import annotations
 from pathlib import Path, PurePath
 import json
+import logging
 import requests
 import datetime
 from urllib.parse import unquote, urljoin, urlparse
 from typing import Any, Optional, Union, Tuple, Dict, Generator, Iterator
 
 from tinycrate.jsonld_context import JSONLDContextResolver
+
+logger = logging.getLogger(__name__)
 
 RO_CRATE_PROFILE = "https://w3id.org/ro/crate/1.3"
 RO_CRATE_CONTEXT = "https://w3id.org/ro/crate/1.3/context"
@@ -208,9 +211,20 @@ class TinyCrate:
             raise TinyCrateException("No @graph in json-ld")
         self.context = jsonld["@context"]
         self.graph = jsonld["@graph"]
-        for e in self.graph:
+        first: dict[str, int] = {}
+        for i, e in enumerate(self.graph):
             if "@id" not in e:
                 raise TinyCrateException(f"Entity with no @id in @graph: {e}")
+            first.setdefault(e["@id"], i)
+        if len(first) < len(self.graph):
+            # A flattened JSON-LD graph has one node per @id. If an @id is
+            # repeated, keep its first occurrence and drop the later ones, as
+            # ro-crate-js does by default
+            duplicates = sorted(
+                {e["@id"] for i, e in enumerate(self.graph) if first[e["@id"]] != i}
+            )
+            logger.warning(f"Duplicate @ids in @graph, keeping first: {duplicates}")
+            self.graph = [e for i, e in enumerate(self.graph) if first[e["@id"]] == i]
         self._id_index = {e["@id"]: (i, e) for i, e in enumerate(self.graph)}
 
     def _open_path(self, path: Path) -> None:
@@ -255,9 +269,20 @@ class TinyCrate:
         self.directory = directory
         self.base_url = None
 
-    def add(self, t: Union[str, list[str]], i: str, props: dict[str, Any]) -> None:
-        """Add an entity. If an entity with this @id already exists it is
-        replaced, as @ids must be unique in an RO-Crate"""
+    def add(
+        self,
+        t: Union[str, list[str]],
+        i: str,
+        props: dict[str, Any],
+        replace: bool = False,
+    ) -> None:
+        """Add an entity. @ids must be unique in an RO-Crate, so if an entity
+        with this @id already exists, raise TinyCrateException unless replace
+        is True, in which case the existing entity is replaced entirely"""
+        if i in self._id_index and not replace:
+            raise TinyCrateException(
+                f"An entity with @id {i} already exists: use replace=True"
+            )
         json_props = dict(props)
         json_props["@id"] = i
         json_props["@type"] = t

@@ -18,7 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   relative `@id`s from that URL; a URL ending in `/` loads the crate root
 - `fetch_bytes()` for binary content; UTF-8 used consistently for metadata
   and for http text with no declared charset
-- `add()` with an existing `@id` replaces the entity instead of duplicating it
+- `add()` with an existing `@id` raises `TinyCrateException` unless called with
+  `replace=True`, which replaces the entity in place instead of duplicating it
+- Loading a graph with duplicate `@id`s keeps the first occurrence and logs a
+  warning (matching ro-crate-js), so `get()`, `all()` and `write_json()` agree
 - Fixed placeholder license fields in `minimal_crate()`
 - Iterating over a `TinyEntity` or using `in` no longer loops forever (#17)
 - `resolve_term()` passes through any absolute IRI, not just http(s)

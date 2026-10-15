@@ -112,11 +112,15 @@ def test_deref_all():
 
 
 def test_add_existing_id():
-    """Adding an entity with an existing @id replaces it, not duplicates it"""
+    """Adding an entity with an existing @id raises unless replace=True, which
+    replaces it in place rather than duplicating it"""
     crate = minimal_crate()
     n = len(crate.graph)
     crate.add("Person", "#alice", {"name": "Alice"})
-    crate.add("Person", "#alice", {"name": "Alice Smith"})
+    with pytest.raises(TinyCrateException):
+        crate.add("Person", "#alice", {"name": "Alice Smith"})
+    assert crate.get("#alice")["name"] == "Alice"
+    crate.add("Person", "#alice", {"name": "Alice Smith"}, replace=True)
     assert len(crate.graph) == n + 1
     assert crate.get("#alice")["name"] == "Alice Smith"
     assert len([e for e in crate.all() if e.id == "#alice"]) == 1
@@ -179,3 +183,59 @@ def test_prop_value_range(kind, how, tmp_path):
             "Bob",
             "Carol",
         ]
+
+
+def test_add_same_id_on_minimal_crate():
+    """Adding entities with the same @id to a minimal crate: a second add()
+    raises and leaves the crate unchanged; with replace=True the new entity
+    replaces the old one entirely, so properties only on the old one are lost"""
+    crate = minimal_crate()
+    n = len(crate.graph)
+    crate.add("Person", "#alice", {"name": "Alice", "email": "a@example.org"})
+    before = crate.json()
+    with pytest.raises(TinyCrateException):
+        crate.add("Person", "#alice", {"name": "Alice Smith"})
+    assert crate.json() == before
+    crate.add("Person", "#alice", {"name": "Alice Smith"}, replace=True)
+    crate.add(["Person", "Author"], "#alice", {"name": "A. Smith"}, replace=True)
+    assert len(crate.graph) == n + 1
+    assert [e.id for e in crate.all()].count("#alice") == 1
+    alice = crate.get("#alice")
+    assert alice.types == ["Person", "Author"]
+    assert alice["name"] == "A. Smith"
+    assert "email" not in alice
+    # the minimal crate's own entities are protected too
+    with pytest.raises(TinyCrateException):
+        crate.add("Dataset", "./", {"name": "Another root"})
+
+
+def _crate_with_duplicate_bob():
+    jsonld = json.loads(minimal_crate().json())
+    jsonld["@graph"] += [
+        {"@id": "#bob", "@type": "Person", "name": "Bob", "email": "b@example.org"},
+        {"@id": "#bob", "@type": "Person", "affiliation": {"@id": "#uni"}},
+    ]
+    return TinyCrate(jsonld)
+
+
+def test_loaded_duplicate_ids_keep_first(caplog):
+    """A loaded graph with a repeated @id isn't flattened JSON-LD. Keep the
+    first occurrence and drop later ones, as ro-crate-js does, with a warning"""
+    crate = _crate_with_duplicate_bob()
+    bob = crate.get("#bob")
+    assert bob["name"] == "Bob"
+    assert bob["email"] == "b@example.org"
+    assert "affiliation" not in bob
+    assert [e.id for e in crate.all()].count("#bob") == 1
+    assert [e["@id"] for e in crate.graph].count("#bob") == 1
+    assert "#bob" in caplog.text
+
+
+def test_loaded_duplicate_ids_edit(tmp_path):
+    """Editing an entity that appeared twice leaves one consistent copy"""
+    crate = _crate_with_duplicate_bob()
+    crate.get("#bob")["name"] = "Robert"
+    crate.write_json(tmp_path)
+    reloaded = TinyCrate(tmp_path)
+    names = [e.get("name") for e in reloaded.graph if e["@id"] == "#bob"]
+    assert names == ["Robert"]
