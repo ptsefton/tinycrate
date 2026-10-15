@@ -125,3 +125,57 @@ def test_add_existing_id():
     alice["name"] = "A. Smith"
     reloaded = TinyCrate(json.loads(crate.json()))
     assert reloaded.get("#alice")["name"] == "A. Smith"
+
+
+# A property can hold a plain value, a list of values, or a list of
+# references to other entities. Each should survive every way of putting it
+# into a crate and getting it back out.
+PROP_VALUES = {
+    "string": "A plain string",
+    "list_of_strings": ["one", "two", "three"],
+    "list_of_refs": [{"@id": "#alice"}, {"@id": "#bob"}, {"@id": "#carol"}],
+}
+
+
+def _crate_with_people():
+    crate = minimal_crate()
+    for name in ["alice", "bob", "carol"]:
+        crate.add("Person", f"#{name}", {"name": name.title()})
+    return crate
+
+
+@pytest.mark.parametrize("kind", PROP_VALUES.keys())
+@pytest.mark.parametrize("how", ["add", "setitem", "jsonld", "disk"])
+def test_prop_value_range(kind, how, tmp_path):
+    """Set a property via add(), entity[prop] =, a JSON-LD dict or a file on
+    disk, and check the whole value comes back intact"""
+    value = PROP_VALUES[kind]
+    crate = _crate_with_people()
+    if how == "setitem":
+        crate.add("Dataset", "#ds", {})
+        crate.get("#ds")["prop"] = value
+    else:
+        crate.add("Dataset", "#ds", {"prop": value})
+    if how == "jsonld":
+        crate = TinyCrate(json.loads(crate.json()))
+    elif how == "disk":
+        crate.write_json(tmp_path)
+        crate = TinyCrate(tmp_path)
+
+    ds = crate.get("#ds")
+    assert ds["prop"] == value
+    assert dict(ds.items())["prop"] == value
+    assert [e for e in crate.all() if e.id == "#ds"][0]["prop"] == value
+    expected_list = value if isinstance(value, list) else [value]
+    assert ds.get_list("prop") == expected_list
+    if kind == "list_of_refs":
+        assert [e.id for e in crate.deref_all(ds, "prop")] == [
+            "#alice",
+            "#bob",
+            "#carol",
+        ]
+        assert [e["name"] for e in crate.deref_all(ds, "prop")] == [
+            "Alice",
+            "Bob",
+            "Carol",
+        ]
