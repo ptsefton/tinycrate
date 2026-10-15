@@ -36,3 +36,22 @@ def test_fetch_percent_encoded_id(tmp_path):
     crate2 = TinyCrate(tmp_path)
     assert crate2.get("data/my%20file.txt").fetch() == "spaces in the name"
     assert crate2.get("./data/plain.txt").fetch() == "dot slash prefix"
+
+
+def test_fetch_relative_from_url_crate(httpserver: HTTPServer):
+    """Relative @ids in a crate loaded over http resolve against its URL"""
+    crate = minimal_crate()
+    crate.add("File", "data/my%20file.txt", {"name": "my file.txt"})
+    httpserver.expect_request("/crate/ro-crate-metadata.json").respond_with_data(
+        crate.json(), content_type="application/json"
+    )
+    httpserver.expect_request("/crate/data/my file.txt").respond_with_data(
+        "remote contents", content_type="text/plain"
+    )
+    for url in [
+        httpserver.url_for("/crate/ro-crate-metadata.json"),
+        httpserver.url_for("/crate/"),
+    ]:
+        crate2 = TinyCrate(url)
+        assert crate2.base_url == httpserver.url_for("/crate/ro-crate-metadata.json")
+        assert crate2.get("data/my%20file.txt").fetch() == "remote contents"

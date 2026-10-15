@@ -3,7 +3,7 @@ from pathlib import Path, PurePath
 import json
 import requests
 import datetime
-from urllib.parse import unquote
+from urllib.parse import unquote, urljoin
 from typing import Any, Optional, Union, Tuple, Dict, Generator
 
 from tinycrate.jsonld_context import JSONLDContextResolver
@@ -87,18 +87,21 @@ class TinyEntity:
             yield k, v
 
     def fetch(self) -> str:
-        """Get this entity's content"""
+        """Get this entity's content. Relative @ids are resolved against
+        the crate's URL if it was loaded from one, otherwise against its
+        directory"""
         if self.id[:4] == "http":
-            return self._fetch_http()
-        else:
-            return self._fetch_file()
+            return self._fetch_http(self.id)
+        if self.crate.base_url is not None:
+            return self._fetch_http(urljoin(self.crate.base_url, self.id))
+        return self._fetch_file()
 
-    def _fetch_http(self) -> str:
-        response = requests.get(self.id)
+    def _fetch_http(self, url: str) -> str:
+        response = requests.get(url)
         if response.ok:
             return response.text
         raise TinyCrateException(
-            f"http request to {self.id} failed with status {response.status_code}"
+            f"http request to {url} failed with status {response.status_code}"
         )
 
     def _fetch_file(self) -> str:
@@ -120,6 +123,8 @@ class TinyCrate:
 
     def __init__(self, source: Union[str, Path, None] = None) -> None:
         self.directory: Optional[Path] = None
+        # URL of the ro-crate-metadata.json, if the crate was loaded from one
+        self.base_url: Optional[str] = None
         self._context_resolver: Optional[JSONLDContextResolver] = None
         self._id_index: dict[str, tuple[int, dict]] = {}
         if source is not None:
@@ -170,11 +175,15 @@ class TinyCrate:
             self._open_jsonld(jsonld)
 
     def _open_url(self, url: str) -> None:
-        """Load a crate from the url of the metadata.json"""
+        """Load a crate from the url of the metadata.json, or of the crate
+        root if the url ends with a /"""
+        if url.endswith("/"):
+            url = url + "ro-crate-metadata.json"
         response = requests.get(url)
         if response.ok:
             jsonld = json.loads(response.text)
             self._open_jsonld(jsonld)
+            self.base_url = url
         else:
             raise TinyCrateException(
                 f"http request to {url} failed with status {response.status_code}"
@@ -188,8 +197,10 @@ class TinyCrate:
         return self._context_resolver
 
     def set_directory(self, directory: Path) -> None:
-        """Set the directory for this crate"""
+        """Set the directory for this crate. Relative @ids will be fetched
+        from this directory even if the crate was loaded from a URL"""
         self.directory = directory
+        self.base_url = None
 
     def add(self, t: Union[str, list[str]], i: str, props: dict[str, Any]) -> None:
         json_props = dict(props)
