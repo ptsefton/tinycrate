@@ -20,24 +20,6 @@ with crates on disk and crates over the network.
             contents = entity.fetch()
             print(contents)
 
-## Development
-
-To develop this package install the depenedencies using `uv`:
-
-```
-# Install in development mode
-uv pip install -e .
-# Manually install packages
-uv pip install pre-commit pytest-httpserver pytest ruff mypy
-```
-
-Run the tests using:
-
-```
-uv run pytest
-```
-    
-
 `url` can be the URL of the `ro-crate-metadata.json` or of the crate root
 (ending in `/`). Relative `@id`s are fetched from the crate's directory or URL.
 
@@ -49,3 +31,27 @@ follows every `{"@id": ...}` reference in a property:
         print(author["name"])
 
 Use `entity.fetch_bytes()` for binary files.
+
+## Development
+
+Install the package and its dev dependencies with [uv](https://docs.astral.sh/uv/),
+which creates a `.venv` from `pyproject.toml` and `uv.lock`:
+
+```
+uv sync
+```
+
+Run the tests and checks:
+
+```
+uv run pytest
+uv run ruff check src tests
+uv run ruff format --check src tests
+uv run mypy src
+```
+
+Or install the pre-commit hooks to run ruff and mypy on each commit:
+
+```
+uv run pre-commit install
+```
