@@ -20,3 +20,15 @@ with crates on disk and crates over the network.
             contents = entity.fetch()
             print(contents)
     
+
+`url` can be the URL of the `ro-crate-metadata.json` or of the crate root
+(ending in `/`). Relative `@id`s are fetched from the crate's directory or URL.
+
+Any property can have a single value or a list. `entity.types` and
+`entity.get_list(prop)` always return lists, and `crate.deref_all(entity, prop)`
+follows every `{"@id": ...}` reference in a property:
+
+    for author in tc_from_url.deref_all(r, "author"):
+        print(author["name"])
+
+Use `entity.fetch_bytes()` for binary files.
