@@ -189,7 +189,11 @@ class TinyCrate:
         return None
 
     def root(self) -> TinyEntity:
+        """Find the Root Data Entity via the metadata descriptor, falling
+        back to the legacy ro-crate-metadata.jsonld id used by RO-Crate 1.0"""
         metadata = self.get("ro-crate-metadata.json")
+        if metadata is None:
+            metadata = self.get("ro-crate-metadata.jsonld")
         if metadata is None:
             raise TinyCrateException("no ro-crate-metadata.json entity")
         root = self.deref(metadata, "about")

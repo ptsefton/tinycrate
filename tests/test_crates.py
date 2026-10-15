@@ -136,3 +136,21 @@ def test_minimal_crate_license():
     assert license["name"] == LICENSE_NAME
     assert license["description"] == LICENSE_DESCRIPTION
     assert license["identifier"] == LICENSE_IDENTIFIER
+
+
+def test_legacy_jsonld_descriptor():
+    """RO-Crate 1.0 crates used ro-crate-metadata.jsonld as the descriptor id"""
+    jsonld = {
+        "@context": "https://w3id.org/ro/crate/1.0/context",
+        "@graph": [
+            {
+                "@id": "ro-crate-metadata.jsonld",
+                "@type": "CreativeWork",
+                "about": {"@id": "./"},
+                "conformsTo": {"@id": "https://w3id.org/ro/crate/1.0"},
+            },
+            {"@id": "./", "@type": "Dataset", "name": "Legacy crate"},
+        ],
+    }
+    crate = TinyCrate(jsonld)
+    assert crate.root()["name"] == "Legacy crate"
