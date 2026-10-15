@@ -14,9 +14,9 @@ with crates on disk and crates over the network.
     r = tc_from_url.root()
 
     for entity in tc_from_url.all():
-        for prop.value in entity.items():
-            print(f"{prop}: {value}"")
-        if entity.type == "File":
+        for prop, value in entity.items():
+            print(f"{prop}: {value}")
+        if entity.has_type("File"):
             contents = entity.fetch()
             print(contents)
     

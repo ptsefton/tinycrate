@@ -32,7 +32,9 @@ class TinyCrateException(Exception):
 class TinyEntity:
     def __init__(self, crate: TinyCrate, ejsonld: dict[str, Any]) -> None:
         self.crate = crate
-        self.type = ejsonld["@type"]
+        # @type may be a single string or a list of strings; use .types or
+        # has_type() to handle both
+        self.type = ejsonld.get("@type")
         self.id = ejsonld["@id"]
         self.props = dict(ejsonld)
         # Store index in parent crate's graph for later updates
@@ -48,6 +50,19 @@ class TinyEntity:
         # Update the corresponding entity in the parent crate's graph
         if self._graph_index is not None:
             self.crate.graph[self._graph_index][prop] = val
+
+    @property
+    def types(self) -> list[str]:
+        """This entity's @type values as a list"""
+        if self.type is None:
+            return []
+        if isinstance(self.type, list):
+            return self.type
+        return [self.type]
+
+    def has_type(self, t: str) -> bool:
+        """True if t is one of this entity's @type values"""
+        return t in self.types
 
     def get_dict(self, prop: str) -> Optional[Dict]:
         """get a property on this entity but only return it if it's a Dict"""
@@ -125,6 +140,9 @@ class TinyCrate:
             raise TinyCrateException("No @graph in json-ld")
         self.context = jsonld["@context"]
         self.graph = jsonld["@graph"]
+        for e in self.graph:
+            if "@id" not in e:
+                raise TinyCrateException(f"Entity with no @id in @graph: {e}")
         self._id_index = {e["@id"]: (i, e) for i, e in enumerate(self.graph)}
 
     def _open_path(self, path: Path) -> None:
@@ -161,7 +179,7 @@ class TinyCrate:
         """Set the directory for this crate"""
         self.directory = directory
 
-    def add(self, t: str, i: str, props: dict[str, Any]) -> None:
+    def add(self, t: Union[str, list[str]], i: str, props: dict[str, Any]) -> None:
         json_props = dict(props)
         json_props["@id"] = i
         json_props["@type"] = t
