@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and for http text with no declared charset
 - `add()` with an existing `@id` replaces the entity instead of duplicating it
 - Fixed placeholder license fields in `minimal_crate()`
+- Iterating over a `TinyEntity` or using `in` no longer loops forever (#17)
+- `resolve_term()` passes through any absolute IRI, not just http(s)
+- `fetch()` only goes to the network for http(s) `@id`s; other absolute IRIs
+  such as `arcp://` raise `TinyCrateException`
 
 ## [0.1.5]
 
