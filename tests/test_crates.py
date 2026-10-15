@@ -154,3 +154,24 @@ def test_legacy_jsonld_descriptor():
     }
     crate = TinyCrate(jsonld)
     assert crate.root()["name"] == "Legacy crate"
+
+
+def test_utf8_metadata_roundtrip(tmp_path):
+    """Non-ASCII metadata is written as UTF-8, unescaped, and reads back"""
+    name = "Ngā mihi — 你好"
+    crate = minimal_crate(name=name)
+    crate.write_json(tmp_path)
+    raw = (tmp_path / "ro-crate-metadata.json").read_bytes().decode("utf-8")
+    assert name in raw
+    assert name in crate.json()
+    assert TinyCrate(tmp_path).root()["name"] == name
+
+
+def test_utf8_metadata_over_http(httpserver: HTTPServer):
+    name = "Ngā mihi — 你好"
+    crate = minimal_crate(name=name)
+    httpserver.expect_request("/ro-crate-metadata.json").respond_with_data(
+        crate.json().encode("utf-8"), content_type="application/json"
+    )
+    crate2 = TinyCrate(httpserver.url_for("/ro-crate-metadata.json"))
+    assert crate2.root()["name"] == name

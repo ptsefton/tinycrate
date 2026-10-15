@@ -55,3 +55,42 @@ def test_fetch_relative_from_url_crate(httpserver: HTTPServer):
         crate2 = TinyCrate(url)
         assert crate2.base_url == httpserver.url_for("/crate/ro-crate-metadata.json")
         assert crate2.get("data/my%20file.txt").fetch() == "remote contents"
+
+
+BINARY = bytes(range(256))
+
+
+def test_fetch_bytes_file(tmp_path):
+    """Binary files can be fetched with fetch_bytes"""
+    (tmp_path / "image.bin").write_bytes(BINARY)
+    crate = minimal_crate()
+    crate.add("File", "image.bin", {"name": "binary"})
+    crate.write_json(tmp_path)
+    crate2 = TinyCrate(tmp_path)
+    assert crate2.get("image.bin").fetch_bytes() == BINARY
+
+
+def test_fetch_bytes_http(httpserver: HTTPServer):
+    httpserver.expect_request("/image.bin").respond_with_data(
+        BINARY, content_type="application/octet-stream"
+    )
+    crate = minimal_crate()
+    url = httpserver.url_for("/image.bin")
+    crate.add("File", url, {"name": "binary"})
+    assert crate.get(url).fetch_bytes() == BINARY
+
+
+def test_fetch_utf8_http(httpserver: HTTPServer):
+    """text/plain with no charset should be read as UTF-8, not ISO-8859-1"""
+    text = "Ngā mihi — 你好 — Ünïcödé"
+    httpserver.expect_request("/nocharset.txt").respond_with_data(
+        text.encode("utf-8"), content_type="text/plain"
+    )
+    httpserver.expect_request("/latin1.txt").respond_with_data(
+        "Ünïcödé".encode("iso-8859-1"), content_type="text/plain; charset=ISO-8859-1"
+    )
+    crate = minimal_crate()
+    for path in ["/nocharset.txt", "/latin1.txt"]:
+        crate.add("File", httpserver.url_for(path), {})
+    assert crate.get(httpserver.url_for("/nocharset.txt")).fetch() == text
+    assert crate.get(httpserver.url_for("/latin1.txt")).fetch() == "Ünïcödé"

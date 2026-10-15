@@ -87,35 +87,67 @@ class TinyEntity:
             yield k, v
 
     def fetch(self) -> str:
-        """Get this entity's content. Relative @ids are resolved against
-        the crate's URL if it was loaded from one, otherwise against its
-        directory"""
-        if self.id[:4] == "http":
-            return self._fetch_http(self.id)
-        if self.crate.base_url is not None:
-            return self._fetch_http(urljoin(self.crate.base_url, self.id))
-        return self._fetch_file()
-
-    def _fetch_http(self, url: str) -> str:
-        response = requests.get(url)
-        if response.ok:
-            return response.text
-        raise TinyCrateException(
-            f"http request to {url} failed with status {response.status_code}"
-        )
-
-    def _fetch_file(self) -> str:
-        if self.crate.directory is None:
-            # maybe use pwd for this?
-            raise TinyCrateException("Can't load file: no crate directory")
-        # @ids are URI references, so file paths may be percent-encoded
-        fn = Path(self.crate.directory) / unquote(self.id)
+        """Get this entity's content as text. Relative @ids are resolved
+        against the crate's URL if it was loaded from one, otherwise against
+        its directory. Content is decoded as UTF-8 unless an http response
+        declares a charset"""
+        url = self._url()
+        if url is not None:
+            response = self._fetch_http(url)
+            charset = _charset(response.headers.get("content-type", ""))
+            try:
+                return response.content.decode(charset or "utf-8")
+            except (UnicodeDecodeError, LookupError) as e:
+                raise TinyCrateException(f"Couldn't decode {url}: {e}")
         try:
-            with open(fn, "r", encoding="utf-8") as fh:
+            with open(self._path(), "r", encoding="utf-8") as fh:
                 content = fh.read()
                 return content
         except Exception as e:
             raise TinyCrateException(f"File read failed: {e}")
+
+    def fetch_bytes(self) -> bytes:
+        """Get this entity's content as bytes, for binary files"""
+        url = self._url()
+        if url is not None:
+            return self._fetch_http(url).content
+        try:
+            return self._path().read_bytes()
+        except Exception as e:
+            raise TinyCrateException(f"File read failed: {e}")
+
+    def _url(self) -> Optional[str]:
+        """The absolute URL to fetch this entity from, or None if it should
+        be fetched from the crate directory"""
+        if self.id[:4] == "http":
+            return self.id
+        if self.crate.base_url is not None:
+            return urljoin(self.crate.base_url, self.id)
+        return None
+
+    def _path(self) -> Path:
+        if self.crate.directory is None:
+            # maybe use pwd for this?
+            raise TinyCrateException("Can't load file: no crate directory")
+        # @ids are URI references, so file paths may be percent-encoded
+        return Path(self.crate.directory) / unquote(self.id)
+
+    def _fetch_http(self, url: str) -> requests.Response:
+        response = requests.get(url)
+        if response.ok:
+            return response
+        raise TinyCrateException(
+            f"http request to {url} failed with status {response.status_code}"
+        )
+
+
+def _charset(content_type: str) -> Optional[str]:
+    """Get the charset parameter from a Content-Type header, if any"""
+    for param in content_type.split(";")[1:]:
+        key, _, value = param.strip().partition("=")
+        if key.lower() == "charset":
+            return value.strip("\"'")
+    return None
 
 
 class TinyCrate:
@@ -170,7 +202,7 @@ class TinyCrate:
             path = path / "ro-crate-metadata.json"
         else:
             self.directory = path.parent
-        with open(path, "r") as fh:
+        with open(path, "r", encoding="utf-8") as fh:
             jsonld = json.load(fh)
             self._open_jsonld(jsonld)
 
@@ -181,7 +213,9 @@ class TinyCrate:
             url = url + "ro-crate-metadata.json"
         response = requests.get(url)
         if response.ok:
-            jsonld = json.loads(response.text)
+            # json.loads detects UTF-8/16/32 from bytes, which is safer than
+            # the encoding requests guesses for response.text
+            jsonld = json.loads(response.content)
             self._open_jsonld(jsonld)
             self.base_url = url
         else:
@@ -262,15 +296,24 @@ class TinyCrate:
         return root
 
     def json(self) -> str:
-        return json.dumps({"@context": self.context, "@graph": self.graph}, indent=2)
+        return json.dumps(
+            {"@context": self.context, "@graph": self.graph},
+            indent=2,
+            ensure_ascii=False,
+        )
 
     def write_json(self, crate_dir: Optional[Path] = None) -> None:
         """Write the json-ld to a file"""
         if crate_dir is None:
             crate_dir = self.directory or Path(".")
         crate_dir.mkdir(parents=True, exist_ok=True)
-        with open(crate_dir / "ro-crate-metadata.json", "w") as jfh:
-            json.dump({"@context": self.context, "@graph": self.graph}, jfh, indent=2)
+        with open(crate_dir / "ro-crate-metadata.json", "w", encoding="utf-8") as jfh:
+            json.dump(
+                {"@context": self.context, "@graph": self.graph},
+                jfh,
+                indent=2,
+                ensure_ascii=False,
+            )
 
     def resolve_term(self, term: str) -> str:
         """Resolve a JSON-LD term like 'name' or 'schema:name' to its full IRI
