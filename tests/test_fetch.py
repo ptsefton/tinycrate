@@ -1,6 +1,6 @@
 from pytest_httpserver import HTTPServer
 
-from tinycrate.tinycrate import TinyCrate
+from tinycrate.tinycrate import TinyCrate, minimal_crate
 
 
 def test_fetch_from_url(crates, httpserver: HTTPServer):
@@ -21,3 +21,18 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
     efile = crate.get(urlid)
     contents2 = efile.fetch()
     assert contents == contents2
+
+
+def test_fetch_percent_encoded_id(tmp_path):
+    """File @ids are URI references, so spaces etc are percent-encoded"""
+    datadir = tmp_path / "data"
+    datadir.mkdir()
+    (datadir / "my file.txt").write_text("spaces in the name", encoding="utf-8")
+    (datadir / "plain.txt").write_text("dot slash prefix", encoding="utf-8")
+    crate = minimal_crate()
+    crate.add("File", "data/my%20file.txt", {"name": "my file.txt"})
+    crate.add("File", "./data/plain.txt", {"name": "plain.txt"})
+    crate.write_json(tmp_path)
+    crate2 = TinyCrate(tmp_path)
+    assert crate2.get("data/my%20file.txt").fetch() == "spaces in the name"
+    assert crate2.get("./data/plain.txt").fetch() == "dot slash prefix"

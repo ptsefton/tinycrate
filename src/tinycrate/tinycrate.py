@@ -3,6 +3,7 @@ from pathlib import Path, PurePath
 import json
 import requests
 import datetime
+from urllib.parse import unquote
 from typing import Any, Optional, Union, Tuple, Dict, Generator
 
 from tinycrate.jsonld_context import JSONLDContextResolver
@@ -104,7 +105,8 @@ class TinyEntity:
         if self.crate.directory is None:
             # maybe use pwd for this?
             raise TinyCrateException("Can't load file: no crate directory")
-        fn = Path(self.crate.directory) / self.id
+        # @ids are URI references, so file paths may be percent-encoded
+        fn = Path(self.crate.directory) / unquote(self.id)
         try:
             with open(fn, "r", encoding="utf-8") as fh:
                 content = fh.read()
