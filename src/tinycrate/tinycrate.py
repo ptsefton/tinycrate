@@ -7,18 +7,16 @@ from typing import Any, Optional, Union, Tuple, Dict, Generator
 
 from tinycrate.jsonld_context import JSONLDContextResolver
 
-LICENSE_ID = ("https://creativecommons.org/licenses/by-nc-sa/3.0/au/",)
-LICENSE_DESCRIPTION = """
-This work is licensed under the Creative Commons 
-Attribution-NonCommercial-ShareAlike 3.0 Australia License.
-To view a copy of this license, visit
-http://creativecommons.org/licenses/by-nc-sa/3.0/au/ or send a letter to
-Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
-"""
+LICENSE_ID = "https://creativecommons.org/licenses/by-nc-sa/3.0/au/"
+LICENSE_DESCRIPTION = (
+    "This work is licensed under the Creative Commons "
+    "Attribution-NonCommercial-ShareAlike 3.0 Australia License. "
+    "To view a copy of this license, visit "
+    "http://creativecommons.org/licenses/by-nc-sa/3.0/au/ or send a letter to "
+    "Creative Commons, PO Box 1866, Mountain View, CA 94042, USA."
+)
 LICENSE_IDENTIFIER = "https://creativecommons.org/licenses/by-nc-sa/3.0/au/"
-LICENSE_NAME = """
-Attribution-NonCommercial-ShareAlike 3.0 Australia (CC BY-NC-SA 3.0 AU)"
-"""
+LICENSE_NAME = "Attribution-NonCommercial-ShareAlike 3.0 Australia (CC BY-NC-SA 3.0 AU)"
 
 
 class TinyCrateException(Exception):
@@ -231,7 +229,6 @@ def minimal_crate(
     to pass in the datePublished to ensure that this can be run
     deterministically in tests"""
     crate = TinyCrate()
-    license_id = "https://creativecommons.org/licenses/by-nc-sa/3.0/au/"
     dp: str = ""
     if date_published is None:
         dp = datetime.datetime.now().isoformat()[:10]
@@ -243,17 +240,17 @@ def minimal_crate(
         {
             "name": name,
             "description": description,
-            "license": {"@id": license_id},
+            "license": {"@id": LICENSE_ID},
             "datePublished": dp,
         },
     )
     crate.add(
         "CreativeWork",
-        license_id,
+        LICENSE_ID,
         {
             "name": LICENSE_NAME,
-            "description": "LICENSE_DESCRIPTION",
-            "identifier": "LICENSE_IDENTIFIER",
+            "description": LICENSE_DESCRIPTION,
+            "identifier": LICENSE_IDENTIFIER,
         },
     )
     crate.add(

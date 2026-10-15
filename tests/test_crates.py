@@ -5,7 +5,14 @@ import datetime
 
 from pytest_httpserver import HTTPServer
 
-from tinycrate.tinycrate import TinyCrate, minimal_crate
+from tinycrate.tinycrate import (
+    TinyCrate,
+    minimal_crate,
+    LICENSE_ID,
+    LICENSE_NAME,
+    LICENSE_DESCRIPTION,
+    LICENSE_IDENTIFIER,
+)
 
 
 def test_minimal_crate():
@@ -117,3 +124,15 @@ def test_load_utf8(crates):
     ) as tfh:
         contents2 = tfh.read()
         assert contents == contents2
+
+
+def test_minimal_crate_license():
+    """The license entity should carry the real name, description and
+    identifier, not placeholder strings"""
+    crate = minimal_crate()
+    license = crate.deref(crate.root(), "license")
+    assert license is not None
+    assert license.id == LICENSE_ID
+    assert license["name"] == LICENSE_NAME
+    assert license["description"] == LICENSE_DESCRIPTION
+    assert license["identifier"] == LICENSE_IDENTIFIER
